@@ -1,20 +1,12 @@
 #!/usr/bin/env bash
 
-# ==============================================================================
-# TP2 - Sistemas Operativos: ABM de Productos con persistencia TSV,
-#        autenticación SHA256 y generación de reporte HTML.
-# ==============================================================================
-
-# Archivos de persistencia
 declare -r ARCH_PRODUCTOS="productos.tsv"
 declare -r ARCH_USUARIOS="usuarios.tsv"
 
-# Códigos de opciones - Menú Inicial
 declare -r -i OPCION_INI_LOGIN=1
 declare -r -i OPCION_INI_REGISTRO=2
 declare -r -i OPCION_INI_SALIR=3
 
-# Códigos de opciones - Menú ABM
 declare -r -i OPCION_ALTA=1
 declare -r -i OPCION_BAJA=2
 declare -r -i OPCION_EDITAR=3
@@ -22,37 +14,19 @@ declare -r -i OPCION_MOSTRAR=4
 declare -r -i OPCION_HTML=5
 declare -r -i OPCION_SALIR=6
 
-# ------------------------------------------------------------------------------
-# Inicialización de entorno
-# ------------------------------------------------------------------------------
 inicializar_archivos() {
-    # Aseguramos que los archivos TSV existan para evitar errores de lectura
     [[ ! -f "$ARCH_PRODUCTOS" ]] && touch "$ARCH_PRODUCTOS"
     [[ ! -f "$ARCH_USUARIOS" ]] && touch "$ARCH_USUARIOS"
 }
 
-# ==============================================================================
-# PUNTO 3 - Seguridad y Autenticación con SHA256
-# ==============================================================================
-# Las contraseñas se almacenan cifradas con sha256sum en usuarios.tsv.
-# El formato del archivo es: usuario<TAB>hash_sha256
-# Al registrar, se cifra la contraseña antes de guardarla.
-# Al iniciar sesión, se cifra el input y se compara contra el hash guardado.
-# ------------------------------------------------------------------------------
-
-# Calcula el hash SHA256 de una cadena de texto
 calcular_hash() {
     local clave="$1"
-    # echo -n evita el salto de línea al final para que el hash sea correcto
     local hash_raw
     hash_raw=$(echo -n "$clave" | sha256sum)
-    # sha256sum retorna: <hash_64_caracteres>  -
-    # Extraemos solo los 64 caracteres del hash mediante subcadena
     local hash_limpio="${hash_raw:0:64}"
     echo "$hash_limpio"
 }
 
-# Verifica si un usuario ya existe en el archivo de usuarios
 usuario_existe() {
     local usuario_buscado="$1"
     [[ ! -f "$ARCH_USUARIOS" ]] && return 1
@@ -67,8 +41,6 @@ usuario_existe() {
     return 1
 }
 
-# Registra un nuevo usuario solicitando nombre y contraseña.
-# Valida que el usuario no exista previamente y guarda la contraseña cifrada.
 registrar_usuario() {
     local usuario=""
     local clave=""
@@ -81,7 +53,6 @@ registrar_usuario() {
         return 1
     fi
 
-    # Validación: no agregar un usuario ya existente
     if usuario_existe "$usuario"; then
         printf "[Error]: El usuario '%s' ya se encuentra registrado.\n" "$usuario" >&2
         return 1
@@ -95,18 +66,14 @@ registrar_usuario() {
         return 1
     fi
 
-    # Cifrar la contraseña con SHA256 antes de guardarla
     local hash_clave
     hash_clave=$(calcular_hash "$clave")
 
-    # Guardar en usuarios.tsv en formato TSV (Usuario<TAB>Hash)
     printf "%s\t%s\n" "$usuario" "$hash_clave" >> "$ARCH_USUARIOS"
     printf "Usuario '%s' registrado exitosamente.\n" "$usuario"
     return 0
 }
 
-# Inicio de sesión con 3 intentos máximos.
-# Compara el hash SHA256 del input contra el almacenado en usuarios.tsv.
 iniciar_sesion() {
     local intentos=0
     local usuario=""
@@ -119,7 +86,6 @@ iniciar_sesion() {
         read -rsp "Contrasena: " clave
         printf "\n"
 
-        # Cifrar la contraseña ingresada para comparar contra la almacenada
         local hash_ingresado
         hash_ingresado=$(calcular_hash "$clave")
 
@@ -146,15 +112,6 @@ iniciar_sesion() {
     return 1
 }
 
-# ==============================================================================
-# PUNTO 2 - Gestión de Productos con persistencia en archivo TSV
-# ==============================================================================
-# Los productos se almacenan en productos.tsv con formato: ID<TAB>Nombre<TAB>Precio
-# Se lee el archivo con:   while IFS=$'\t' read -r col1 col2 col3; do ... done < productos.tsv
-# Las operaciones de alta, baja y edición trabajan directamente sobre el archivo.
-# ------------------------------------------------------------------------------
-
-# Verifica si un producto con el ID dado ya existe en el archivo
 producto_existe() {
     local id_buscado="$1"
     [[ ! -f "$ARCH_PRODUCTOS" ]] && return 1
@@ -169,8 +126,6 @@ producto_existe() {
     return 1
 }
 
-# Alta de producto: solicita ID, nombre y precio.
-# Valida que no exista un producto con el mismo ID antes de agregarlo.
 alta_producto() {
     local id=""
     local nombre=""
@@ -184,7 +139,6 @@ alta_producto() {
         return 1
     fi
 
-    # Validación: no agregar un producto ya existente
     if producto_existe "$id"; then
         printf "[Error]: Ya existe un producto con el ID '%s'. Operacion cancelada.\n" "$id" >&2
         return 1
@@ -202,14 +156,11 @@ alta_producto() {
         return 1
     fi
 
-    # Guardar en productos.tsv (ID<TAB>Nombre<TAB>Precio)
     printf "%s\t%s\t%s\n" "$id" "$nombre" "$precio" >> "$ARCH_PRODUCTOS"
     printf "Producto '%s' (ID: %s) guardado con precio $%s.\n" "$nombre" "$id" "$precio"
     return 0
 }
 
-# Baja de producto: elimina el producto cuyo ID coincide.
-# Reconstruye el archivo sin la línea del producto eliminado.
 baja_producto() {
     local id=""
 
@@ -236,8 +187,6 @@ baja_producto() {
     return 0
 }
 
-# Editar producto: modifica el nombre y precio de un producto existente.
-# Reconstruye el archivo reemplazando la línea del producto editado.
 editar_producto() {
     local id=""
 
@@ -277,7 +226,6 @@ editar_producto() {
     return 0
 }
 
-# Muestra el inventario leyendo productos.tsv línea por línea
 mostrar_inventario() {
     printf "\n--- INVENTARIO DE PRODUCTOS ---\n"
 
@@ -296,17 +244,10 @@ mostrar_inventario() {
     done < "$ARCH_PRODUCTOS"
 }
 
-# ==============================================================================
-# PUNTO 1 - Generación de Reporte HTML (productos.html)
-# ==============================================================================
-# Genera un archivo "productos.html" con un título y una tabla con
-# las columnas ID, Nombre y Precio leyendo los datos desde productos.tsv.
-# ------------------------------------------------------------------------------
 generar_reporte_html() {
     local salida="productos.html"
     printf "\nGenerando reporte en '%s'...\n" "$salida"
 
-    # Cabecera del HTML con estilos
     cat <<EOF > "$salida"
 <!DOCTYPE html>
 <html lang="es">
@@ -381,7 +322,6 @@ generar_reporte_html() {
             <tbody>
 EOF
 
-    # Cuerpo de la tabla: leer productos.tsv línea por línea
     if [[ -s "$ARCH_PRODUCTOS" ]]; then
         local id nombre precio
         while IFS=$'\t' read -r id nombre precio; do
@@ -402,7 +342,6 @@ EOF
 EOF
     fi
 
-    # Cierre del HTML
     cat <<EOF >> "$salida"
             </tbody>
         </table>
@@ -414,9 +353,6 @@ EOF
     printf "Reporte generado con exito. Puede abrir '%s' en su navegador.\n" "$salida"
 }
 
-# ==============================================================================
-# Menú Principal de Productos (tras autenticación exitosa)
-# ==============================================================================
 menu_productos() {
     local opcion=0
 
@@ -459,13 +395,6 @@ menu_productos() {
     done
 }
 
-# ==============================================================================
-# PUNTO 3 - Menú de Entrada: Iniciar Sesión / Registrar Usuario
-# ==============================================================================
-# Al ejecutar el script se presentan dos opciones principales:
-# - Iniciar sesión (compara contra usuarios.tsv con hash SHA256)
-# - Registrar usuario (crea nuevo usuario con contraseña cifrada)
-# ------------------------------------------------------------------------------
 menu_inicio() {
     local opcion=0
 
@@ -498,9 +427,6 @@ menu_inicio() {
     done
 }
 
-# ==============================================================================
-# Punto de Entrada
-# ==============================================================================
 main() {
     inicializar_archivos
     menu_inicio
@@ -508,4 +434,3 @@ main() {
 }
 
 main
-
